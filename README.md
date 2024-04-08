@@ -250,3 +250,132 @@ Print:
 # lp -d <printer name> <file name>
 lp -d Canon_SELPHY_CP1500 P1010464.JPG
 ```
+
+## Troubleshooting
+
+### PiBooth
+
+When running `pibooth` it fail out due to detection camera issues:
+```
+pibooth
+pygame 2.5.2 (SDL 2.28.3, Python 3.9.2)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+pygame-menu 4.0.7
+[ INFO    ] pibooth           : Installed plugins:
+[ INFO    ] pibooth           : Starting the photo booth application on Raspberry pi 4B
+/usr/local/lib/python3.9/dist-packages/pluggy/_manager.py:469: PluggyTeardownRaisedWarning: A plugin raised an exception during an old-style hookwrapper teardown.
+Plugin: pibooth-core:camera, Hook: pibooth_setup_camera
+OSError: Neither Raspberry Pi nor GPhoto2 nor OpenCV camera detected
+For more information see https://pluggy.readthedocs.io/en/stable/api_reference.html#pluggy.PluggyTeardownRaisedWarning
+  outcome = Result.from_call(
+Traceback (most recent call last):
+  File "/usr/local/bin/pibooth", line 8, in <module>
+    sys.exit(main())
+  File "/usr/local/lib/python3.9/dist-packages/pibooth/booth.py", line 490, in main
+    app = PiApplication(config, plugin_manager)
+  File "/usr/local/lib/python3.9/dist-packages/pibooth/booth.py", line 131, in __init__
+    self.camera = self._pm.hook.pibooth_setup_camera(cfg=self._config)
+  File "/usr/local/lib/python3.9/dist-packages/pluggy/_hooks.py", line 501, in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+  File "/usr/local/lib/python3.9/dist-packages/pluggy/_manager.py", line 119, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+  File "/usr/local/lib/python3.9/dist-packages/pluggy/_manager.py", line 473, in traced_hookexec
+    return outcome.get_result()
+  File "/usr/local/lib/python3.9/dist-packages/pluggy/_result.py", line 99, in get_result
+    raise exc.with_traceback(exc.__traceback__)
+  File "/usr/local/lib/python3.9/dist-packages/pluggy/_result.py", line 61, in from_call
+    result = func()
+  File "/usr/local/lib/python3.9/dist-packages/pluggy/_manager.py", line 470, in <lambda>
+    lambda: oldcall(hook_name, hook_impls, caller_kwargs, firstresult)
+  File "/usr/local/lib/python3.9/dist-packages/pluggy/_callers.py", line 155, in _multicall
+    teardown[0].send(outcome)
+  File "/usr/local/lib/python3.9/dist-packages/pibooth/plugins/camera_plugin.py", line 28, in pibooth_setup_camera
+    cam = camera.find_camera()
+  File "/usr/local/lib/python3.9/dist-packages/pibooth/camera/__init__.py", line 52, in find_camera
+    raise EnvironmentError("Neither Raspberry Pi nor GPhoto2 nor OpenCV camera detected")
+OSError: Neither Raspberry Pi nor GPhoto2 nor OpenCV camera detected
+```
+
+This might be cause your camera is not connected properly or switched off, **OR** gphoto2 python library doesn't recognize it. See "x   GPhoto2 lib" section.
+
+### GPhoto2 lib
+
+Once you've instsalled [gphoto2 python lib](), might happen that importing it from a python script would result in an import error:
+
+```py
+>>> import gphoto2
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+  File "/usr/local/lib/python3.9/dist-packages/gphoto2/__init__.py", line 30, in <module>
+    from gphoto2.abilities_list import *
+  File "/usr/local/lib/python3.9/dist-packages/gphoto2/abilities_list.py", line 10, in <module>
+    import gphoto2.port_info_list
+  File "/usr/local/lib/python3.9/dist-packages/gphoto2/port_info_list.py", line 10, in <module>
+    from ._port_info_list import *
+ImportError: /usr/local/lib/python3.9/dist-packages/gphoto2/_port_info_list.cpython-39-aarch64-linux-gnu.so: undefined symbol: gp_port_init_localedir, version LIBGPHOTO2_5_0
+```
+
+Seems that current version of `libgphoto2` (the C-based library used to actually build the python gphoto2 lib) doesn't recognize or include `gp_port_init_localedir`. Let's see what is my version
+
+```sh
+$ gphoto2 -v
+gphoto2 2.5.28
+
+...
+
+This version of gphoto2 is using the following software versions and options:
+gphoto2         2.5.28         gcc, popt(m), exif, no cdk, no aa, jpeg, no readline
+libgphoto2      2.5.27         standard camlibs, gcc, ltdl, EXIF
+libgphoto2_port 0.12.0         iolibs: disk ptpip serial usb1 usbdiskdirect usbscsi, gcc, ltdl, EXIF, USB, serial without locking
+```
+Ok, I see `libgphoto2` is at v `2.5.27`. 
+
+Looking at the [developer readme](https://github.com/jim-easterbrook/python-gphoto2/tree/284ddac77b91ec325bce9754f5dc867e506f5893/developer) of the python lib (well recommended to read), you can see the change log, as well as other useful stuff. Here's what it list (trail end):
+
+```
+...
+
+2.5.30    Add gp_init_localedir & gp_port_init_localedir functions
+2.5.31    No change
+```
+
+Bingo! `gp_port_init_localedir` has been implemented from v `2.5.30` on.
+Now, as the dev guide says, we need to:
+> To build python-gphoto2 with a different version of libgphoto2 than the one installed on your system you first need to build a local copy of libgphoto2. [Download and extract the libgphoto2 source](https://sourceforge.net/projects/gphoto/files/libgphoto/), change to the source directory and then configure, build and install
+
+Let's do it then:
+
+```sh
+# download the latest version (2.5.31 at the moment of writing)
+wget https://sourceforge.net/projects/gphoto/files/libgphoto/2.5.31/libgphoto2-2.5.31.tar.xz
+
+# unzip the archive
+tar xf libgphoto2-2.5.31.tar.xz
+cd libgphoto2-2.5.31
+
+# Configure lib prior to build
+# Note the use of --prefix=$PWD/local_install to create a local copy, rather than a system installation.
+./configure --prefix=$PWD/local_install CFLAGS="-std=gnu99 -g -O2"
+make
+make install
+
+# build and install python package that includes your local copy of the libgphoto2 libs
+# The GPHOTO2_ROOT environment variable tells setup.py to use the files in libgphoto2-2.5.31/local_install. This value needs to be an absolute path.
+GPHOTO2_ROOT=$PWD/libgphoto2-2.5.31/local_install pip install --user . -v
+```
+
+Let's see if it worked:
+```sh
+$ python
+Python 3.9.2 (default, Feb 28 2021, 17:03:44)
+[GCC 10.2.1 20210110] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> try:
+...     import gphoto2
+...     print('Yay!')
+... except:
+...     print('Still no luck :(')
+...     raise
+...
+Yay!
+```
