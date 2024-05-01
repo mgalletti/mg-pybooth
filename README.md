@@ -3,6 +3,37 @@ MG own photo booth project
 
 # Raspberry Pi
 
+## GPIO Header
+A powerful feature of the Raspberry Pi is the row of GPIO (general-purpose input/output) pins along the top edge of the board. A 40-pin GPIO header is found on all current Raspberry Pi boards, although it is unpopulated on Raspberry Pi Zero, Raspberry Pi Zero W, and Raspberry Pi Zero 2 W. The GPIO headers on all boards have a 0.1in (2.54mm) pin pitch.
+
+Below the schema in ASCII art:
+
+```text
+                  Pin #  
+           +3V3 [01] [02] +5V
+ SDA1 / GPIO  2 [03] [04] +5V
+ SCL1 / GPIO  3 [05] [06] GND
+        GPIO  4 [07] [08] GPIO 14 / TXD0
+            GND [09] [10] GPIO 15 / RXD0
+        GPIO 17 [11] [12] GPIO 18
+        GPIO 27 [13] [14] GND
+        GPIO 22 [15] [16] GPIO 23
+           +3V3 [17] [18] GPIO 24
+ MOSI / GPIO 10 [19] [20] GND
+ MISO / GPIO  9 [21] [22] GPIO 25
+  CLK / GPIO 11 [23] [24] GPIO  8 / CE0#
+            GND [25] [26] GPIO  7 / CE1#
+ID_SD / GPIO  0 [27] [28] GPIO  1 / ID_SC
+        GPIO  5 [29] [30] GND
+        GPIO  6 [31] [32] GPIO 12
+        GPIO 13 [33] [34] GND
+ MISO / GPIO 19 [35] [36] GPIO 16 / CE2#
+        GPIO 26 [37] [38] GPIO 20 / MOSI
+            GND [39] [40] GPIO 21 / SCLK
+```
+
+http://weyprecht.de/2015/11/30/raspberry-pi-ascii-art/
+
 ## Leds
 
 For this project I'm using a 5050 non-addressable led strip, which you can buy for ~10 € on discount stores on e-commerce.
@@ -24,9 +55,9 @@ pip install pigpio
 
 Then you can set individual led brightness using 0-255 values:
 ```sh
-pigs p 17 000
-pigs p 22 255 # green
-pigs p 24 000
+pigs p 17 000 # red (off)
+pigs p 22 255 # green (on)
+pigs p 24 000 # blue (off)
 ```
 
 To free up GPIO pins set up, kill `pigpiod` service.
